@@ -25,6 +25,14 @@ const userSchema = Schema(
             required: true,
         },
         token: String,
+        verify: {
+            type: Boolean,
+            default: false,
+        },
+        verificationToken: {
+            type: String,
+            default: '',
+        },
     },
     {
         versionKey: false,
@@ -46,6 +54,14 @@ userSchema.methods.setToken = function (payload) {
 
 userSchema.methods.deleteToken = function () {
     this.token = null;
+};
+
+userSchema.methods.setVerify = function (value) {
+    this.verify = value;
+};
+
+userSchema.methods.setVerificationToken = function (verificationToken) {
+    this.verificationToken = verificationToken;
 };
 
 userSchema.post('save', handleSchemaValidationError);

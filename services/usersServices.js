@@ -1,9 +1,15 @@
 const { User } = require('../models');
-const { RequestError, createNameFromEmail } = require('../helpers');
+const {
+    RequestError,
+    createNameFromEmail,
+    transporter,
+    createVerificationEmail,
+} = require('../helpers');
 const gravatar = require('gravatar');
 const Jimp = require('jimp');
 const path = require('path');
 const fs = require('fs/promises');
+const { v4: uuid } = require('uuid');
 
 const avatarsDir = path.join(__dirname, '../', 'public', 'avatars');
 
@@ -14,8 +20,17 @@ const register = async ({ email, password }) => {
 
     const avatarURL = gravatar.url(email, { protocol: 'https' });
     const user = new User({ email, avatarURL });
+    const verificationToken = uuid();
+
     user.setPassword(password);
+    user.setVerificationToken(verificationToken);
     const newUser = await user.save();
+
+    const mail = createVerificationEmail({
+        recipient: newUser.email,
+        verificationToken,
+    });
+    await transporter.sendMail(mail);
 
     return {
         email: newUser.email,
@@ -24,12 +39,43 @@ const register = async ({ email, password }) => {
     };
 };
 
+const verify = async verificationToken => {
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) throw RequestError(404, 'Not found');
+
+    user.setVerify(true);
+    user.setVerificationToken('');
+    await user.save();
+
+    return 'Verification successful';
+};
+
+const resendVerificationEmail = async email => {
+    const user = await User.findOne({ email });
+
+    if (!user) throw RequestError(404, 'Not found');
+    if (user.verify)
+        throw RequestError(400, 'Verification has already been passed');
+
+    const mail = createVerificationEmail({
+        recipient: email,
+        verificationToken: user.verificationToken,
+    });
+
+    await transporter.sendMail(mail);
+
+    return 'Verification email sent';
+};
+
 const logIn = async ({ email, password }) => {
     const user = await User.findOne({ email });
     if (!user) throw RequestError(404, 'Not found');
 
     if (!user.validatePassword(password))
         throw RequestError(401, 'Email or password is wrong');
+
+    if (!user.verify) throw RequestError(403, 'Email not verified');
 
     user.setToken({ id: user.id });
 
@@ -94,6 +140,8 @@ const updateAvatar = async (tempUpload, originalname, id, email) => {
 
 module.exports = {
     register,
+    verify,
+    resendVerificationEmail,
     logIn,
     logOut,
     listCurrent,
