@@ -13,6 +13,24 @@ const registerUser = async (req, res) => {
     res.status(201).json(newUser);
 };
 
+const verifyUser = async (req, res) => {
+    const { verificationToken } = req.params;
+
+    const result = await usersServices.verify(verificationToken);
+
+    res.json({ message: result });
+};
+
+const resendUserVerificationEmail = async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) throw RequestError(400, 'Missing required field email');
+
+    const result = await usersServices.resendVerificationEmail(email);
+
+    res.json({ message: result });
+};
+
 const logInUser = async (req, res) => {
     const { error, value: userData } = usersSchemas.registerUser.validate(
         req.body,
@@ -67,6 +85,8 @@ const updateUserAvatar = async (req, res) => {
 
 module.exports = {
     registerUser,
+    verifyUser,
+    resendUserVerificationEmail,
     logInUser,
     logOutUser,
     listCurrentUser,
